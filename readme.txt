@@ -3,15 +3,15 @@ Contributors: webzunft
 Tags: ads, ad, adblock, adblocker, ad blocker, ad block, adblock count, adblock counter, ad analysis, ad optimization
 Requires at least: 3.4
 Tested up to: 3.5.1
-Stable tag: 1.2.4.1
+Stable tag: 1.2.5.1
 License: GPLv3 or later
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
-Count how many of your visitors actually use an ad blocker.
+Count the number of visits from users with an ad blocker.
 
 == Description ==
 
-*BlockAlyzer* counts how many of your visitors actually use an ad blocker. You might use this to estimate the impact of adblock add-ons on your income from advertisement.
+*BlockAlyzer* counts how many of your visitors are using an ad blocker. You might use this to estimate the impact of adblock add-ons on your income from advertisement.
 
 **compare your data with others**
 
@@ -54,6 +54,18 @@ e.g.
 3. statistics table with benchmark data
 
 == Changelog ==
+
+= 1.2.5.1 =
+
+* fixed some rogue css affecting all admin pages
+
+= 1.2.5 =
+
+* optimized styling on statistics page
+* fixed language issue for multisite
+* added locale to benchmark data
+* added plugin version when sending benchmark
+* added plugin banner
 
 = 1.2.4.1 =
 

@@ -1,7 +1,7 @@
 <?php
 /*
   Plugin Name: BlockAlyzer - Adblock counter
-  Version: 1.2.4.1
+  Version: 1.2.5.1
   Plugin URI: http://webgilde.com/en/blockalyzer/
   Description: Count how many of your visitors are using an adblock plugin.
   Author: Thomas Maier
@@ -33,7 +33,7 @@ if (!function_exists('add_action')) {
     exit();
 }
 
-define('BAVERSION', '1.2.4.1');
+define('BAVERSION', '1.2.5.1');
 define('BANAME', 'blockalyzer-adblock-counter');
 define('BATD', 'blockalyzer');
 define('BADIR', basename(dirname(__FILE__)));
@@ -216,7 +216,7 @@ if (!class_exists('BA_CLASS')) {
          * add statistics page for the default adblock counter
          */
         public function add_stats_page() {
-            $this->_hooks['stats'] = add_management_page(__('BlockAlyzer Statistics', BATD), __('AdBlock Stats', BATD), 'manage_options', 'adblock-counter', array($this, 'render_stats_page'));
+            $this->_hooks['stats'] = add_management_page(__('BlockAlyzer Statistics', BATD), __('adblock stats', BATD), 'manage_options', 'adblock-counter', array($this, 'render_stats_page'));
             add_action('load-'. $this->_hooks['stats'], array( $this, 'contextual_help'));
         }
 
@@ -268,7 +268,7 @@ if (!class_exists('BA_CLASS')) {
                 __('You can send a request every 3 hours', BATD),
                 __('Your last reset was more than 24 hours ago', BATD),
                 __('You have at least 20 visits and page views', BATD),
-                __('You have at least 1 visit and page view with AdBlock', BATD),
+                __('You have at least 1 visit and page view with an ad blocker', BATD),
             );
             
             $screen->add_help_tab( array(
@@ -282,13 +282,14 @@ if (!class_exists('BA_CLASS')) {
             $data_send = array(
                 __('Hash - to check source', BATD),
                 __('Domain - to prevent duplicate data', BATD),
-                __('Language', BATD),
+                __('Language and Locale', BATD),
                 __('Last reset - when have your data been reset (to prevent duplicate content', BATD),
                 __('Number of Views', BATD),
-                __('Number of View with AdBlock', BATD),
+                __('Number of Views with an ad blocker', BATD),
                 __('Number of Unique Visitors', BATD),
-                __('Number of Unique Visitors with AdBlock', BATD),
+                __('Number of Unique Visitors with an ad blocker', BATD),
                 __('Site topic (if specified)', BATD),
+                __('BlockAlyzer version', BATD),
             );
             
             $screen->add_help_tab( array(
@@ -413,7 +414,7 @@ if (!class_exists('BA_CLASS')) {
          * render settings section
          */
         public function render_settings_section() {
-            ?><p><?php _e('You can choose one or more of the methods below to display the AdBlock statistics. If you disable all methods, measuring will be disabled.', BATD); ?></p><?php
+            ?><p><?php _e('You can choose one or more of the methods below to display the ad blocker statistics. If you disable all methods, measuring will be disabled.', BATD); ?></p><?php
         }
 
         /**
@@ -731,11 +732,11 @@ if (!class_exists('BA_CLASS')) {
          */
         public function stat_method_standard_count_reset_statistics() {
 
-            update_option('ba_page_views', 100);
-            update_option('ba_page_views_blocked', 10);
-            update_option('ba_unique_visitors', 110);            
-            update_option('ba_unique_visitors_blocked', 10);
-            update_option('ba_last_reset', 1370606621 );
+            update_option('ba_page_views', 0);
+            update_option('ba_page_views_blocked', 0);
+            update_option('ba_unique_visitors', 0);            
+            update_option('ba_unique_visitors_blocked', 0);
+            update_option('ba_last_reset', time() );
 
             $this->_update_nonce();
         }        
@@ -745,7 +746,7 @@ if (!class_exists('BA_CLASS')) {
          * conditions:
          * * data is at least 24 hours old
          * * at least 20 visits and views
-         * * at least 1 visit and view with AdBlock
+         * * at least 1 visit and view with ad block
          * @since 1.2
          */
         public function compare_allowed() {
