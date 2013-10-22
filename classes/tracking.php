@@ -17,6 +17,7 @@ if (!class_exists('BA_Tracking')) {
         /**
          * send blog adblock data and compare with data from others
          * @param array site options
+         * @updated 1.2.5
          */
         static function compare( $siteoptions = array() ) {
 
@@ -26,15 +27,28 @@ if (!class_exists('BA_Tracking')) {
                 $hash = md5( site_url() );
                 update_option('ba_tracking_hash', $hash);
             }
+            
+            $locales = get_bloginfo('language');
+            $lang = '';
+            $locale = '';
+                
+            if (!empty($locales)) {
+                $locales = explode('-', $locales);
+                if ( count( $locales ) >= 2 ) {
+                    $lang = $locales[0];
+                    $locale = $locales[1];
+                }
+            } 
 
             $data = array(
                 'site' => array(
                     'hash' => $hash,
                     'url' => site_url(),
                     'name' => '', //get_bloginfo('name'),
-                    'lang' => get_locale(),
-                    'country' => '',
+                    'lang' => $lang,
+                    'locale' => $locale,
                     'category' => $siteoptions['benchmark_category'],
+                    'version' => BAVERSION,
                 ),
                 'stats' => array(
                     'last_reset' => get_option('ba_last_reset', 0),
