@@ -1,7 +1,7 @@
 <?php
 /*
   Plugin Name: BlockAlyzer - Adblock counter
-  Version: 1.2.4.1
+  Version: 1.2.6.1
   Plugin URI: http://webgilde.com/en/blockalyzer/
   Description: Count how many of your visitors are using an adblock plugin.
   Author: Thomas Maier
@@ -23,7 +23,7 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  */
 
 //avoid direct calls to this file
@@ -33,7 +33,7 @@ if (!function_exists('add_action')) {
     exit();
 }
 
-define('BAVERSION', '1.2.4.1');
+define('BAVERSION', '1.2.6.1');
 define('BANAME', 'blockalyzer-adblock-counter');
 define('BATD', 'blockalyzer');
 define('BADIR', basename(dirname(__FILE__)));
@@ -57,40 +57,40 @@ if (!class_exists('BA_CLASS')) {
          * methods for statistics
          */
         public $_stat_methods = array();
-        
+
         /**
          * active stats methods
          */
         public $_active_stat_methods = array();
-        
+
         /**
          * if any stats method is enabled, this is true
          */
         public $_is_measuring = false;
-        
+
         /**
          * contains compare data
          * @since 1.2
          */
         public $_compare_data = array();
-        
+
         /**
          * flag if compare is allowed
          * @since 1.2
          */
         public $_compare_allowed = false;
-        
+
         /**
          * page hooks
          * @since 1.2
          */
         public $_hooks = array();
-        
+
         /**
          * site categories
          */
         public $_site_categories = array();
-        
+
         /**
          * plugin options
          */
@@ -109,37 +109,48 @@ if (!class_exists('BA_CLASS')) {
             add_action('init', array($this, 'load_adblock_constant'));
             // load statistic methods
             add_action('init', array($this, 'load_stat_methods'), 1);
+            // load textdomain for translation
+            add_action('plugins_loaded', array($this, 'load_textdomain'));
 
             if ( is_admin() ) {
                 // run if this was an upgrade
                 $this->upgrade();
-                
+
                 add_action('admin_menu', array($this, 'add_stats_page'));
                 add_action('admin_menu', array($this, 'add_settings_page'));
                 add_action('admin_init', array($this, 'add_settings_options'));
                 add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
+                add_action('wp_dashboard_setup', array($this, 'add_dashboard_widget'));
             }
-            
+
             // everything connected with the measuing in the frontend
             if ( !is_admin() ) {
-                add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));    
+                add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
                 add_action('init', array($this, 'create_user_id'), 10);
                 add_action('wp_head', array($this, 'head_js'), 1);
                 add_action('wp_footer', array($this, 'include_bannergif'));
                 add_action('wp_footer', array($this, 'display_footer'));
-                
+
                 // hooks for the standard stat method
-                add_action('ba_js_footer', array($this, 'stat_method_standard_js'));                
+                add_action('ba_js_footer', array($this, 'stat_method_standard_js'));
             }
-            
+
             // ajax call for logged in and not logged in users
             add_action('wp_ajax_standard_count', array($this, 'stat_method_standard_count'));
             add_action('wp_ajax_nopriv_standard_count', array($this, 'stat_method_standard_count'));
             add_action('wp_ajax_get_user_id', array($this, 'get_user_id'));
             add_action('wp_ajax_nopriv_get_user_id', array($this, 'get_user_id'));
-            
+
             $this->_options = get_option('ba_settings', array() );
-            
+
+        }
+
+        /**
+         * load textdomain
+         * @since 1.3
+         */
+        public function load_textdomain() {
+            load_plugin_textdomain( BATD, false, BADIR . '/languages' );
         }
 
         /**
@@ -167,7 +178,38 @@ if (!class_exists('BA_CLASS')) {
                 }
             }
         }
-        
+
+        /**
+         * add dashboard widget
+         * @since 1.3
+         */
+        public function add_dashboard_widget(){
+            wp_add_dashboard_widget(
+                 'blockalyzer_dashboard_widget',
+                 __('Blockalyzer AdBlock Counter', BATD),
+                 array($this, 'dashboard_widget_functions')
+            );
+        }
+
+        /**
+         * add content to dashboard widgets
+         * @since 1.3
+         */
+        public function dashboard_widget_functions(){
+            // load compare data
+            if ( empty( $this->_compare_data ) && get_option('ba_last_stats') ) {
+                $this->_compare_data = get_option('ba_last_stats');
+            }
+            // check if data can be compared with benchmark
+            if ( $this->compare_allowed() ) {
+                $this->_compare_allowed = true;
+            } else {
+                $this->_compare_allowed = false;
+            }
+            require_once 'templates/dashboard_widget.php';
+        }
+
+
         /**
          * load statistic methods
          */
@@ -176,27 +218,27 @@ if (!class_exists('BA_CLASS')) {
             $stat_methods = array(
                 'basic' => array(
                     'name' => __('Basic method', BATD),
-                    'active' => 0,
+                    'active' => 1,
                     'description' => sprintf(__('You can see your statistics in <em><a href="%s" title="Go to statistics page">Tools > AdBlock Stats</a></em>', BATD), admin_url('tools.php?page=adblock-counter')),
                 )
             );
             // hook to register new stat methods
             $this->_stat_methods = apply_filters('ba_stat_methods', $stat_methods);
-            
+
             // load information about active stat methods
             $this->get_active_stat_methods();
-            
+
         }
-        
+
         /**
          * get the information which stats method is enabled
          * loads the 'active' flag into $this->_stat_methods for each method
          * @todo what, if the number and kind of methods don't match?
          */
         public function get_active_stat_methods() {
-            
+
             $active_stat_methods = array();
-            
+
             if ( !empty( $this->_stat_methods ) && is_array( $this->_stat_methods )) {
                 // get stat methods status
                 $active_methods = $this->_options['methods'];
@@ -207,7 +249,7 @@ if (!class_exists('BA_CLASS')) {
                     }
                 }
             }
-            
+
             $this->_active_stat_methods = $active_stat_methods;
             $this->_is_measuring = ( count( $this->_active_stat_methods ) > 0 ) ? 1 : 0;
         }
@@ -216,7 +258,7 @@ if (!class_exists('BA_CLASS')) {
          * add statistics page for the default adblock counter
          */
         public function add_stats_page() {
-            $this->_hooks['stats'] = add_management_page(__('BlockAlyzer Statistics', BATD), __('AdBlock Stats', BATD), 'manage_options', 'adblock-counter', array($this, 'render_stats_page'));
+            $this->_hooks['stats'] = add_management_page(__('BlockAlyzer Statistics', BATD), __('adblock stats', BATD), 'manage_options', 'adblock-counter', array($this, 'render_stats_page'));
             add_action('load-'. $this->_hooks['stats'], array( $this, 'contextual_help'));
         }
 
@@ -236,83 +278,84 @@ if (!class_exists('BA_CLASS')) {
         public function add_settings_options() {
 
             register_setting('ba_settings_group', 'ba_settings', array($this, 'sanitize_settings'));
-            
+
             add_settings_section('ba_settings_section', __('Stats Method', BATD), array($this, 'render_settings_section'), 'ba-settings-page');
 
             // choose stats method
-            if ( !empty( $this->_stat_methods ) && is_array( $this->_stat_methods )) { 
+            if ( !empty( $this->_stat_methods ) && is_array( $this->_stat_methods )) {
                 $count = count( $this->_stat_methods );
                 $i = 1;
                 foreach( $this->_stat_methods as $_method_key => $_method ) {
                     // check if this is the last field
                     $last =  ( $count === $i++ ) ? 'last' : '';
                     add_settings_field('ba_methods_' . $_method_key, $_method['name'], array($this, 'render_settings_method'), 'ba-settings-page', 'ba_settings_section', array( $_method_key, $_method, $last ) );
-                }       
-            }     
+                }
+            }
             // options for benchmark page
-            add_settings_field('ba_benchmark_category', __('Site Topic'), array($this, 'render_settings_benchmark_category'), 'ba-settings-page', 'ba_settings_section' );
-            
+            add_settings_field('ba_benchmark_category', __('Site Topic', BATD), array($this, 'render_settings_benchmark_category'), 'ba-settings-page', 'ba_settings_section' );
+
         }
-        
+
         /**
          * add contextual help
          * @since 1.2
          */
         public function contextual_help() {
-            
+
             $screen = get_current_screen();
-            if ($screen->id != $this->_hooks['stats']) return;       
-            
+            if ($screen->id != $this->_hooks['stats']) return;
+
             // conditions to send data
             $conditions = array(
                 __('You can send a request every 3 hours', BATD),
                 __('Your last reset was more than 24 hours ago', BATD),
                 __('You have at least 20 visits and page views', BATD),
-                __('You have at least 1 visit and page view with AdBlock', BATD),
+                __('You have at least 1 visit and page view with an ad blocker', BATD),
             );
-            
+
             $screen->add_help_tab( array(
                 'id'	=> 'ba_conditions',
                 'title'	=> __('Conditions', BATD),
                 'content'	=> '<h3>' . __( 'Conditions under which your data will be accepted and compared with others.', BATD ) . '</h3><ul><li>' .
                     implode('</li><li>', $conditions ) . '</li></ul>',
             ) );
-            
+
             // array with data we are sending to server; for localization
             $data_send = array(
                 __('Hash - to check source', BATD),
                 __('Domain - to prevent duplicate data', BATD),
-                __('Language', BATD),
+                __('Language and Locale', BATD),
                 __('Last reset - when have your data been reset (to prevent duplicate content', BATD),
                 __('Number of Views', BATD),
-                __('Number of View with AdBlock', BATD),
+                __('Number of Views with an ad blocker', BATD),
                 __('Number of Unique Visitors', BATD),
-                __('Number of Unique Visitors with AdBlock', BATD),
+                __('Number of Unique Visitors with an ad blocker', BATD),
                 __('Site topic (if specified)', BATD),
+                __('BlockAlyzer version', BATD),
             );
-            
+
             $screen->add_help_tab( array(
                 'id'	=> 'ba_data',
                 'title'	=> __('Data you send', BATD),
                 'content'	=> '<h3>' . __( 'List of the data you send to our server.', BATD ) . '</h3><ul><li>' .
                     implode('</li><li>', $data_send ) . '</li></ul>',
             ) );
-            
+
             // content for help tab with data we return
             $data_return = array(
-                __('general Benchmark with page views and unique users for your localization', BATD),                
-                __('if site topic provided: benchmark for your category and localization', BATD),                
+                __('general Benchmark with page views and unique users for your localization', BATD),
+                __('if site topic provided: benchmark for your category and localization', BATD),
             );
-            
+
             $screen->add_help_tab( array(
                 'id'	=> 'ba_return',
                 'title'	=> __('Data you get', BATD),
                 'content'	=> '<h3>' . __( 'List of the data you get from our server.', BATD ) . '</h3><ul><li>' .
                     implode('</li><li>', $data_return ) . '</li></ul>',
             ) );
-            
+
         }
-        
+
         /**
          * callback for option to choose the method of measurement
          * @param array $method with 1. value as index, second array with method information
@@ -320,9 +363,9 @@ if (!class_exists('BA_CLASS')) {
          */
         public function render_settings_method( $method ) {
 
-            ?><input name="ba_settings[methods][<?php echo $method[0]; ?>]" id="ba_methods_<?php echo $method[0]; ?>" type="checkbox" value="1" <?php 
+            ?><input name="ba_settings[methods][<?php echo $method[0]; ?>]" id="ba_methods_<?php echo $method[0]; ?>" type="checkbox" value="1" <?php
             checked(1, $method[1]['active'] ) ?>/><span class="description"><?php echo $method[1]['description']; ?></span><?php
-            
+
             // if this is the last field, start another block of options
             if ( !empty($method[2]) && $method[2] == 'last' ) {
                 ?></td></tr></tbody></table>
@@ -332,9 +375,9 @@ if (!class_exists('BA_CLASS')) {
                 <table class="form-table"><tbody><tr><td>
                 <?php
             }
-            
+
         }
-        
+
         /**
          * render select field for benchmark category
          * @since 1.2.2
@@ -352,7 +395,7 @@ if (!class_exists('BA_CLASS')) {
             <p class="description"><?php _e('If you enter your sites topic, you will receive additional benchmark data.', BATD ); ?></p>
             <?php
         }
-        
+
         /**
          * sanitize the option values
          * especially include current values if not send via checkbox
@@ -360,18 +403,18 @@ if (!class_exists('BA_CLASS')) {
          * @updated 1.2.3
          */
         public function sanitize_settings ( $options ) {
-            
+
             if ( isset( $options['methods'] ) && !empty( $this->_stat_methods ) && is_array( $this->_stat_methods )) {
-                
+
                 foreach ( $this->_stat_methods as $_key => $_method ) {
                     if ( !isset( $options['methods'][ $_key ] ) ) {
                         $options['methods'][ $_key ] = 0;
                     }
                 }
-                
+
             }
-            
-            return $options;   
+
+            return $options;
         }
 
         /**
@@ -380,7 +423,7 @@ if (!class_exists('BA_CLASS')) {
          */
         public function render_stats_page() {
             if (!current_user_can('manage_options')) {
-                wp_die(__('You do not have sufficient permissions to access this page.'));
+                wp_die(__('You do not have sufficient permissions to access this page.', BATD));
             }
             if (!empty($_POST['bacounter'])) {
                 // reset statistics
@@ -399,7 +442,7 @@ if (!class_exists('BA_CLASS')) {
             if ( empty( $this->_compare_data ) && get_option('ba_last_stats') ) {
                 $this->_compare_data = get_option('ba_last_stats');
             }
-            
+
             if ( $this->compare_allowed() ) {
                 $this->_compare_allowed = true;
             } else {
@@ -413,7 +456,7 @@ if (!class_exists('BA_CLASS')) {
          * render settings section
          */
         public function render_settings_section() {
-            ?><p><?php _e('You can choose one or more of the methods below to display the AdBlock statistics. If you disable all methods, measuring will be disabled.', BATD); ?></p><?php
+            ?><p><?php _e('You can choose one or more of the methods below to display the ad blocker statistics. If you disable all methods, measuring will be disabled.', BATD); ?></p><?php
         }
 
         /**
@@ -422,7 +465,7 @@ if (!class_exists('BA_CLASS')) {
          */
         public function render_settings_page() {
             if (!current_user_can('manage_options')) {
-                wp_die(__('You do not have sufficient permissions to access this page.'));
+                wp_die(__('You do not have sufficient permissions to access this page.', BATD));
             }
             ?><div id="icon-options-general" class="icon32"><br></div>
             <h2><?php _e('BlockAlyzer Settings', BATD); ?></h2>
@@ -436,7 +479,7 @@ if (!class_exists('BA_CLASS')) {
                         do_settings_sections('ba-settings-page');
                         ?>
                     </div>
-                    
+
                     <p class="submit">
                         <input type="submit" name="submit" id="submit" class="button button-primary" value="<?php _e('Save Changes', BATD); ?>">
                     </p>
@@ -448,7 +491,7 @@ if (!class_exists('BA_CLASS')) {
          * add scripts for the frontend
          */
         public function enqueue_scripts() {
-            
+
             if ( !$this->_is_measuring ) return;
             // enqueue empty advertisement.js
             wp_register_script('adblock-counter-testjs', plugins_url('js/advertisement.js', __FILE__), array('jquery'), BAVERSION);
@@ -471,7 +514,7 @@ if (!class_exists('BA_CLASS')) {
          */
         public function create_user_id() {
             if ( !$this->_is_measuring ) return;
-            
+
             if (!empty($_COOKIE['BaUniqueVisitorId'])) {
                 $this->_user_id = $_COOKIE['BaUniqueVisitorId'];
             } else {
@@ -498,7 +541,7 @@ if (!class_exists('BA_CLASS')) {
             if ( !$this->_is_measuring ) return;
             ?><img id = "ba_banner" src = "<?php echo plugins_url('/img/ads/banner.gif', __FILE__); ?>" alt = "banner" width = "1" height = "1" /><?php
         }
-        
+
         /**
          * basic js functions that are needed
          * added to the header, because other plugins might need them earlier
@@ -522,7 +565,7 @@ if (!class_exists('BA_CLASS')) {
                     setTimeout(function(){ // timeout to run after loading the advertisement.js
                         // count for missing js file
                         var nonce = '<?php echo get_option('ba_nonce'); ?>';
-                        <?php /* 
+                        <?php /*
                          * set unique user id; currently not needed, but maybe for a later use
                         if ( !BaGetCookie('BaUniqueVisitorId') || BaGetCookie('BaUniqueVisitorId') == 0 ) {
                             var data = { action: 'get_user_id' };
@@ -536,13 +579,13 @@ if (!class_exists('BA_CLASS')) {
                             ba_blocked=true;
                         }
 
-                        var banner = document.getElementById("ba_banner");                        
+                        var banner = document.getElementById("ba_banner");
 
                         if (banner == null || banner.offsetHeight == 0){
                             ba_blocked=true;
                         }
 
-                        if(ba_blocked==true){	
+                        if(ba_blocked==true){
                             BaSetCookie('BaAdBlock', 'enabled', 30);
                         }else{
                             BaSetCookie('BaAdBlock', 'disabled', 30);
@@ -573,9 +616,9 @@ if (!class_exists('BA_CLASS')) {
             update_option('ba_nonce', $nonce);
             return $nonce;
         }
-        
+
         // EVERYTHING NEEDED FOR STANDARD STATS METHOD
-        
+
         /**
          * js code to use for the standard measurement method
          * @since 1.1.2
@@ -590,8 +633,8 @@ if (!class_exists('BA_CLASS')) {
                 if ($.adblockJsFile === undefined){
                     data.ba_count_jsFile = true;
                 }
-                
-                data.ba_count_banner = false;    
+
+                data.ba_count_banner = false;
                 if (banner == null || banner.offsetHeight == 0){
                     data.ba_count_banner = true;
                 }
@@ -599,16 +642,16 @@ if (!class_exists('BA_CLASS')) {
                 $.post(BaAjax.ajaxurl, data, function(response) {
                     <?php /* if ( !AbcGetCookie('AbcUniqueVisitorJsFile') || AbcGetCookie('AbcUniqueVisitorJsFile') != nonce  ) {
                         AbcSetCookie('AbcUniqueVisitorJsFile', nonce, 30);
-                    }     
+                    }
                     if ( !AbcGetCookie('AbcUniqueVisitorBanner') || AbcGetCookie('AbcUniqueVisitorBanner') != nonce  ) {
-                        AbcSetCookie('AbcUniqueVisitorBanner', nonce, 30);     
+                        AbcSetCookie('AbcUniqueVisitorBanner', nonce, 30);
                     }     */ ?>
                     if ( !BaGetCookie('BaUniqueVisitor') || BaGetCookie('BaUniqueVisitor') != nonce ) {
-                        BaSetCookie('BaUniqueVisitor', nonce, 30);    
+                        BaSetCookie('BaUniqueVisitor', nonce, 30);
                     }
             });<?php
         }
-        
+
         /**
          * Should combine the total page views
          * @since 1.1
@@ -617,12 +660,12 @@ if (!class_exists('BA_CLASS')) {
 
             $this->stat_method_standard_count_page_views();
             $this->stat_method_standard_count_unique_visitors();
-            
+
             if (isset($_POST['blocked']) && $_POST['blocked'] == "true") {
                 $this->stat_method_standard_count_blocked_page_views();
                 $this->stat_method_standard_count_blocked_unique_visitors();
             }
-            
+
             /* if (isset($_POST['abc_count_jsFile']) && $_POST['abc_count_jsFile'] == "true") {
                 $this->stat_method_standard_count_jsFile();
             }
@@ -631,7 +674,7 @@ if (!class_exists('BA_CLASS')) {
             } */
             wp_die();
         }
-        
+
         /**
          * count the total page views
          * @update 1.1
@@ -723,29 +766,29 @@ if (!class_exists('BA_CLASS')) {
                 $uniques++;
                 update_option('ba_unique_visitors_bannerFile', $uniques);
             }
-        }       
-        
+        }
+
         /**
          * reset the statistics to 0
          * @updated 1.2
          */
         public function stat_method_standard_count_reset_statistics() {
 
-            update_option('ba_page_views', 100);
-            update_option('ba_page_views_blocked', 10);
-            update_option('ba_unique_visitors', 110);            
-            update_option('ba_unique_visitors_blocked', 10);
-            update_option('ba_last_reset', 1370606621 );
+            update_option('ba_page_views', 0);
+            update_option('ba_page_views_blocked', 0);
+            update_option('ba_unique_visitors', 0);
+            update_option('ba_unique_visitors_blocked', 0);
+            update_option('ba_last_reset', time() );
 
             $this->_update_nonce();
-        }        
-        
+        }
+
         /**
          * check, if comparing data is allowed
          * conditions:
          * * data is at least 24 hours old
          * * at least 20 visits and views
-         * * at least 1 visit and view with AdBlock
+         * * at least 1 visit and view with ad block
          * @since 1.2
          */
         public function compare_allowed() {
@@ -762,19 +805,19 @@ if (!class_exists('BA_CLASS')) {
             if ( 1  >   intval ( get_option('ba_page_views', 0))) return false;
             return true;
         }
-        
+
         /**
          * save the compare data
          * @since 1.2.1
          */
         public function save_compare_data( $data ) {
-            
+
             if ( empty( $data->general->totalViews )) return;
-            
+
             update_option( 'ba_last_stats', $data );
-            
+
         }
-        
+
         /**
          * upgrade script
          */
@@ -820,22 +863,22 @@ if (!class_exists('BA_CLASS')) {
             }
             update_option( 'ba_version', BAVERSION );
         }
-        
+
         /**
          * return benchmark site categories
          * @since 1.2.3
          */
         public function get_site_categories () {
-            
+
             if ( empty( $this->_site_categories ) ) {
                 require_once( BAPATH . 'inc/site_categories.php');
                 if ( empty( $site_categories ) ) return;
                 $this->_site_categories = $site_categories;
             }
             return $this->_site_categories;
-            
+
         }
-        
+
     }
 
     $blockalyzer = new BA_CLASS();
